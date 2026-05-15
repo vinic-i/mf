@@ -1,0 +1,417 @@
+\documentclass[12pt, a4paper]{article}
+
+% ============================================================
+% PACOTES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+\usepackage{lmodern}
+
+% ============================================================
+% GEOMETRIA DA PÁGINA
+% ============================================================
+\geometry{
+  top=2.5cm,
+  bottom=2.5cm,
+  left=3cm,
+  right=2cm
+}
+
+% ============================================================
+% CABEÇALHO E RODAPÉ
+% ============================================================
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Backtest -- Estratégia Bollinger + Min/Max}
+\lhead{\small B3 -- Ações com Liquidez}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+% ESPAÇAMENTO
+% ============================================================
+\setstretch{1.3}
+
+% ============================================================
+% ESTILO DE CÓDIGO (Python)
+% ============================================================
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\definecolor{codegreen}{rgb}{0.0,0.45,0.0}
+\definecolor{codepurple}{rgb}{0.55,0.0,0.55}
+\definecolor{codeorange}{rgb}{0.8,0.35,0.0}
+
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{codeorange},
+  commentstyle=\color{codegreen}\itshape,
+  numberstyle=\tiny\color{gray},
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  frame=single,
+  rulecolor=\color{gray!40},
+  language=Python,
+  morekeywords={True, False, None},
+  literate=
+    {á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+    {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+    {â}{{\^a}}1 {ê}{{\^e}}1 {î}{{\^i}}1 {ô}{{\^o}}1 {û}{{\^u}}1
+    {ã}{{\~a}}1 {õ}{{\~o}}1 {ç}{{\c{c}}}1 {Ç}{{\c{C}}}1
+    {ã}{{\~a}}1 {Ã}{{\~A}}1 {ñ}{{\~n}}1
+}
+
+\lstset{style=pythonstyle}
+
+% ============================================================
+% CONFIGURAÇÃO DE HYPERLINKS
+% ============================================================
+\hypersetup{
+  colorlinks=true,
+  linkcolor=codeblue,
+  urlcolor=codeblue,
+  citecolor=codeblue
+}
+
+% ============================================================
+% TÍTULO
+% ============================================================
+\title{
+  \vspace{-1cm}
+  {\Large \textbf{Backtest de Estratégia Técnica}} \\[0.4cm]
+  {\large Bollinger Bands + Mínima/Máxima de Curto Prazo} \\[0.3cm]
+  {\normalsize Ações da B3 -- Timeframe Diário (D1)} \\[0.2cm]
+  {\small Período: 01/01/2020 a 01/01/2026}
+}
+\author{}
+\date{}
+
+% ============================================================
+% DOCUMENTO
+% ============================================================
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+% ============================================================
+\section{Descrição da Estratégia}
+% ============================================================
+
+A estratégia avaliada combina dois filtros de \textit{sobrevendido} para identificar pontos de entrada em ações da B3:
+
+\begin{itemize}
+  \item \textbf{Sinal de entrada (compra):} o fechamento do candle rompe \textit{abaixo} da mínima dos últimos 7 candles \textbf{e} simultaneamente está abaixo da banda inferior das Bandas de Bollinger (período 13, desvio 1,61).
+  \item \textbf{Sinal de saída (venda):} o fechamento supera a máxima dos últimos 9 candles, indicando recuperação da resistência de curto prazo.
+\end{itemize}
+
+\noindent As ordens são executadas sempre no \textbf{candle seguinte ao sinal} (\texttt{signal.shift(1)}), evitando o \textit{look-ahead bias}. Os custos operacionais (0,30\%) e o \textit{slippage} estimado (0,10\%) são descontados em cada entrada e saída.
+
+% ============================================================
+\section{Configurações do Backtest}
+% ============================================================
+
+\begin{center}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Parâmetro} & \textbf{Valor} \\
+  \midrule
+  Ativos & PETR4, ITUB4, VALE3, ABEV3, WEGE3 \\
+  Timeframe & Diário (D1) \\
+  Período & 01/01/2020 -- 01/01/2026 \\
+  Dados & Ajustados por dividendos e desdobramentos \\
+  Custo operacional & 0,30\% por operação \\
+  \textit{Slippage} & 0,10\% por operação \\
+  Mínima (entrada) & 7 candles \\
+  Máxima (saída) & 9 candles \\
+  Bollinger -- período & 13 \\
+  Bollinger -- desvio & 1,61 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ============================================================
+\section{Resultados Consolidados}
+% ============================================================
+
+A Figura~\ref{fig:tabela} apresenta a tabela com todas as métricas de desempenho calculadas para cada ativo.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_resumo.png}
+  \caption{Métricas consolidadas do backtest para todos os ativos.}
+  \label{fig:tabela}
+\end{figure}
+
+\noindent A Figura~\ref{fig:comparativo} compara as curvas de capital de todos os ativos no mesmo período.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/comparativo_equity.png}
+  \caption{Comparativo das curvas de capital -- todos os ativos (base = 1,00).}
+  \label{fig:comparativo}
+\end{figure}
+
+% ============================================================
+\section{Análise por Ativo}
+% ============================================================
+
+% --------------------------------------------------------
+\subsection{PETR4.SA -- Petróleo Brasileiro S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_PETR4.png}
+  \caption{Curva de capital -- PETR4.SA.}
+  \label{fig:equity_petr4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_PETR4.png}
+  \caption{Drawdown (\%) -- PETR4.SA.}
+  \label{fig:dd_petr4}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{ITUB4.SA -- Itaú Unibanco}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_ITUB4.png}
+  \caption{Curva de capital -- ITUB4.SA.}
+  \label{fig:equity_itub4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_ITUB4.png}
+  \caption{Drawdown (\%) -- ITUB4.SA.}
+  \label{fig:dd_itub4}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{VALE3.SA -- Vale S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_VALE3.png}
+  \caption{Curva de capital -- VALE3.SA.}
+  \label{fig:equity_vale3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_VALE3.png}
+  \caption{Drawdown (\%) -- VALE3.SA.}
+  \label{fig:dd_vale3}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{ABEV3.SA -- Ambev S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_ABEV3.png}
+  \caption{Curva de capital -- ABEV3.SA.}
+  \label{fig:equity_abev3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_ABEV3.png}
+  \caption{Drawdown (\%) -- ABEV3.SA.}
+  \label{fig:dd_abev3}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{WEGE3.SA -- WEG S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_WEGE3.png}
+  \caption{Curva de capital -- WEGE3.SA.}
+  \label{fig:equity_wege3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_WEGE3.png}
+  \caption{Drawdown (\%) -- WEGE3.SA.}
+  \label{fig:dd_wege3}
+\end{figure}
+
+% ============================================================
+\section{Código-Fonte Comentado}
+% ============================================================
+
+\subsection{Importações e Configurações Globais}
+
+\begin{lstlisting}[caption={Bibliotecas e parâmetros globais.}]
+import os
+import yfinance as yf       # download de dados OHLCV historicos da B3
+import pandas as pd         # manipulacao de series temporais (DataFrames)
+import numpy as np          # calculos numericos vetorizados
+import matplotlib.pyplot as plt   # geracao dos graficos
+import ta                   # indicadores tecnicos (Bollinger Bands)
+
+# Ativos selecionados por liquidez na B3
+tickers = ['PETR4.SA', 'ITUB4.SA', 'VALE3.SA', 'ABEV3.SA', 'WEGE3.SA']
+
+data_inicial = '2020-01-01'
+data_final   = '2026-01-01'
+intervalo    = '1d'     # timeframe diario (D1)
+
+custo_op = 0.003  # 0,30% -- corretagem + emolumentos B3
+slippage = 0.001  # 0,10% -- diferenca estimada de execucao
+\end{lstlisting}
+
+\subsection{Download e Indicadores}
+
+\begin{lstlisting}[caption={Download dos dados e cálculo dos indicadores.}]
+df = yf.download(
+    ticker,
+    start=data_inicial,
+    end=data_final,
+    interval=intervalo,
+    auto_adjust=True   # ajusta preco por dividendos e desdobramentos
+)
+df.columns = df.columns.get_level_values(0)  # remove MultiIndex
+
+# Minima rolante de 7 periodos (suporte de curto prazo)
+df['min7'] = df['Low'].rolling(7).min()
+
+# Maxima rolante de 9 periodos (resistencia / alvo de saida)
+df['max9'] = df['High'].rolling(9).max()
+
+# Banda inferior de Bollinger via biblioteca `ta`
+# = media(13) - 1.61 * desvio_padrao(13)
+bb = ta.volatility.BollingerBands(close=df['Close'], window=13, window_dev=1.61)
+df['bb_lower'] = bb.bollinger_lband()
+\end{lstlisting}
+
+\subsection{Sinais e Controle de Posição}
+
+\begin{lstlisting}[caption={Geração dos sinais e loop de controle de posição.}]
+# Sinal de COMPRA: fechamento abaixo da minima de 7 candles
+# E abaixo da banda inferior de Bollinger (duplo filtro)
+df['buy_trigger'] = (df['Close'] <= df['min7']) & (df['Close'] < df['bb_lower'])
+
+# Sinal de SAIDA: fechamento acima da maxima dos ultimos 9 candles
+df['exit_trigger'] = df['Close'] >= df['max9']
+
+# Loop de controle: gera coluna signal = 1 (comprado) ou 0 (fora)
+df['signal'] = 0
+posicionado  = False
+for i in range(len(df)):
+    if not posicionado and df['buy_trigger'].iloc[i]:
+        df.iloc[i, df.columns.get_loc('signal')] = 1  # entrada
+        posicionado = True
+    elif posicionado and df['exit_trigger'].iloc[i]:
+        df.iloc[i, df.columns.get_loc('signal')] = 0  # saida
+        posicionado = False
+    elif posicionado:
+        df.iloc[i, df.columns.get_loc('signal')] = 1  # mantém comprado
+\end{lstlisting}
+
+\subsection{Retornos, Custos e Curva de Capital}
+
+\begin{lstlisting}[caption={Cálculo dos retornos líquidos e curva de capital.}]
+df['returns']  = df['Close'].pct_change()  # retorno diario do ativo
+
+# shift(1): ordem executada no candle SEGUINTE ao sinal (evita look-ahead)
+df['strategy'] = df['signal'].shift(1) * df['returns']
+
+# Desconta custo + slippage nas transicoes de posicao
+mudancas = df['signal'].diff().abs()
+df['strategy_net'] = df['strategy'] - mudancas * (custo_op + slippage)
+
+# Curva de capital: produto acumulado de (1 + retorno diario liquido)
+# Interpreta: R$ 1,00 investido evoluiria para equity.iloc[-1]
+df['equity'] = (1 + df['strategy_net'].fillna(0)).cumprod()
+\end{lstlisting}
+
+\subsection{Cálculo das Métricas}
+
+\begin{lstlisting}[caption={Métricas de desempenho calculadas para cada ativo.}]
+# Retorno acumulado = valor final da equity - 1
+retorno_total = df['equity'].iloc[-1] - 1
+
+# Drawdown maximo: maior queda percentual a partir do pico anterior
+rolling_max  = df['equity'].cummax()
+drawdown_ser = (df['equity'] - rolling_max) / rolling_max
+max_drawdown = drawdown_ser.min()
+
+# Sharpe ratio anualizado (252 pregoes/ano)
+# Mede retorno por unidade de risco (volatilidade diaria)
+ret_diarios = df['strategy_net'].dropna()
+sharpe = (ret_diarios.mean() / ret_diarios.std()) * np.sqrt(252)
+
+# Identificacao dos trades individuais via diff() do sinal
+entradas = df.index[df['signal'].diff() ==  1].tolist()
+saidas   = df.index[df['signal'].diff() == -1].tolist()
+
+# Retorno composto de cada trade
+trade_returns = []
+for s, e in zip(entradas, saidas):
+    tr = (1 + df.loc[s:e, 'strategy_net'].fillna(0)).prod() - 1
+    trade_returns.append(tr)
+
+wins   = np.array([r for r in trade_returns if r  > 0])
+losses = np.array([r for r in trade_returns if r <= 0])
+
+pct_acerto    = len(wins) / len(trade_returns)         # % de acerto
+payoff        = abs(wins.mean() / losses.mean())       # ganho medio / perda media
+profit_factor = abs(wins.sum()  / losses.sum())        # soma ganhos / soma perdas
+\end{lstlisting}
+
+% ============================================================
+\section{Definições das Métricas}
+% ============================================================
+
+\begin{description}
+  \item[\textbf{Retorno Acumulado}] Ganho total da estratégia no período, calculado como $\text{equity}_{\text{final}} - 1$.
+
+  \item[\textbf{Drawdown Máximo}] Maior queda percentual observada em relação ao pico anterior da curva de capital. Mede o pior cenário de perda intermediária suportado pelo investidor.
+  $$\text{DD}_t = \frac{\text{equity}_t - \max(\text{equity}_{1..t})}{\max(\text{equity}_{1..t})}$$
+
+  \item[\textbf{Sharpe Ratio}] Retorno médio ajustado pela volatilidade, anualizado com base em 252 pregões. Valores acima de 1 indicam boa relação risco-retorno.
+  $$\text{Sharpe} = \frac{\bar{r}}{\sigma_r} \times \sqrt{252}$$
+
+  \item[\textbf{Percentual de Acerto}] Proporção de trades com resultado positivo sobre o total de trades encerrados.
+
+  \item[\textbf{Payoff}] Relação entre o ganho médio dos trades vencedores e a perda média dos perdedores. Payoff $> 1$ significa que os ganhos médios superam as perdas médias.
+
+  \item[\textbf{Profit Factor}] Soma dos ganhos brutos dividida pela soma das perdas brutas. Valor $> 1$ indica estratégia lucrativa; $> 1{,}5$ é considerado robusto; $> 2$ é excelente.
+\end{description}
+
+\end{document}
