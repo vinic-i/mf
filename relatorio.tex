@@ -1,0 +1,774 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{lmodern}
+\usepackage{setspace}
+\usepackage{url}
+\usepackage[top=2cm, bottom=2cm, left=2cm, right=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{indentfirst}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+% ============================================================
+% CONFIGURAÇÃO DE HYPERLINKS
+% ============================================================
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=codeblue,
+  urlcolor=codeblue,
+  citecolor=codeblue
+}
+
+% ============================================================
+% CABEÇALHO E RODAPÉ
+% ============================================================
+\fancyhf{}
+\rhead{\small Backtest -- Estratégia Bollinger + Min/Max}
+\lhead{\small B3 -- Ações com Liquidez}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+% CONFIGURAÇÃO PARA CÓDIGOS PYTHON
+% ============================================================
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{codegreen}{rgb}{0.0,0.45,0.0}
+\definecolor{codepurple}{rgb}{0.55,0.0,0.55}
+\definecolor{codeorange}{rgb}{0.8,0.35,0.0}
+
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codegray},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codeblue}\bfseries,
+  stringstyle=\color{codeorange},
+  commentstyle=\color{codegreen}\itshape,
+  numberstyle=\tiny\color{gray},
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  frame=single,
+  rulecolor=\color{gray!40},
+  language=Python,
+  morekeywords={True, False, None},
+  literate=
+    {á}{{\'{a}}}1 {é}{{\'{e}}}1 {í}{{\'{i}}}1 {ó}{{\'{o}}}1 {ú}{{\'{u}}}1
+    {Á}{{\'{A}}}1 {É}{{\'{E}}}1 {Í}{{\'{I}}}1 {Ó}{{\'{O}}}1 {Ú}{{\'{U}}}1
+    {â}{{\^{a}}}1 {ê}{{\^{e}}}1 {î}{{\^{i}}}1 {ô}{{\^{o}}}1 {û}{{\^{u}}}1
+    {ã}{{\~{a}}}1 {õ}{{\~{o}}}1 {ç}{{\c{c}}}1 {Ç}{{\c{C}}}1
+    {Ã}{{\~{A}}}1 {ñ}{{\~{n}}}1
+}
+
+\lstset{style=pythonstyle}
+
+\setlength{\parindent}{4ex}
+
+\titleformat{\section}{\normalfont\fontsize{11}{13}\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\fontsize{10}{13}\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+\setstretch{1.15}
+
+\thispagestyle{empty}
+
+%%%%%%%%%%%% LOGO %%%%%%%%%%%%%%%%%%%
+\begin{figure}[!ht]
+\centering
+\subfloat{
+\includegraphics[width=2.7cm]{Imagens/brasao_flat.png}
+\label{UFRN Logo}
+}
+\end{figure}
+
+%%%%%%%%%%%%%%% CAPA %%%%%%%%%%%%%%%%%
+\begin{center}
+{\bf{UNIVERSIDADE FEDERAL DO RIO GRANDE DO NORTE\\
+CENTRO DE CIÊNCIAS EXATAS E DA TERRA\\
+DEPARTAMENTO DE ENGENHARIA DE COMPUTAÇÃO E AUTOMAÇÃO / MATEMÁTICA\\
+DISCIPLINA: INVESTIMENTOS NO MERCADO FINANCEIRO\\}}
+
+\vspace{5cm}
+
+{\bf{\Large RELATÓRIO TÉCNICO: BACKTEST E OTIMIZAÇÃO WALK-FORWARD\\}}
+{\bf{\large Estratégia: Duplo 7 Modificado (Bandas de Bollinger + Mínimas)\\}}
+
+\vspace{4.5cm}
+
+VINICIUS HENRIQUE DOS SANTOS\\
+MARCOS PAULO ARAÚJO DE ABREU\\
+LAURA GABRIELLI DE BRITO QUEIROZ\\
+FELIPE MAYCON SANTOS FRANCA
+
+\vspace{5cm}
+
+{Natal/RN\\
+2026}
+\end{center}
+
+\newpage
+
+%%%%%%%%%%%%%%% SUMÁRIO %%%%%%%%%%%%%%
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%% LISTA DE FIGURAS %%%%%
+\thispagestyle{empty}
+\listoffigures
+\newpage
+
+%%%%%%%%%%%%%%% INÍCIO DO CONTEÚDO %%%
+\pagestyle{fancy}
+
+% ============================================================
+\section{Métodos}
+% ============================================================
+
+Esta seção apresenta o \textit{setup} operacional utilizado no estudo, bem como os critérios adotados para sua aplicação e avaliação. O objetivo é detalhar a lógica de geração dos sinais de compra e venda, os ativos selecionados para os testes e a implementação computacional empregada na execução das operações. Dessa forma, busca-se garantir a transparência do processo e permitir a reprodução dos resultados obtidos.
+
+% ============================================================
+\subsection{Duplo 7 Modificado (Bandas de Bollinger + Mínimas)}
+% ============================================================
+
+A estratégia avaliada denomina-se \textbf{Duplo 7 Modificado} e combina dois filtros de \textit{sobrevendido} para identificar pontos de entrada em ações da B3. A lógica central baseia-se na convergência de dois indicadores técnicos: o rompimento da mínima de curto prazo e a posição do preço em relação à volatilidade histórica medida pelas Bandas de Bollinger. Trata-se de uma adaptação do \textit{setup} original \textit{Double-7} (Connors \& Alvarez, 2009), que utiliza somente a mínima de sete dias, incorporando um segundo filtro estatístico baseado em desvio-padrão.
+
+\begin{itemize}
+  \item \textbf{Sinal de entrada (compra):} o fechamento do candle rompe \textit{abaixo} da mínima dos últimos 7 candles \textbf{e} simultaneamente está abaixo da banda inferior das Bandas de Bollinger (período 13, desvio 1{,}61). Esse duplo filtro exige que o ativo apresente fraqueza tanto no contexto de curto prazo (mínima recente) quanto em termos de volatilidade estatística (Bollinger), reduzindo sinais falsos em comparação ao \textit{setup} original.
+  \item \textbf{Sinal de saída (venda):} o fechamento supera a máxima dos últimos 9 candles, indicando recuperação da resistência de curto prazo e encerramento da posição compradora.
+  \item \textbf{Controle de posição:} o sistema só entra se não estiver posicionado e só sai se estiver comprado, evitando operações duplas.
+\end{itemize}
+
+\noindent As ordens são executadas sempre no \textbf{candle seguinte ao sinal} (\texttt{signal.shift(1)}), evitando o \textit{look-ahead bias} --- prática que consiste em usar informações futuras no momento da tomada de decisão. Os custos operacionais (0{,}30\%) e o \textit{slippage} estimado (0{,}10\%) são descontados em cada entrada e saída, aproximando os resultados simulados da realidade operacional.
+
+% ============================================================
+\subsection{Ações Escolhidas}
+% ============================================================
+
+Os ativos selecionados para aplicação do \textit{setup} foram escolhidos com base em critérios de \textbf{liquidez} e \textbf{representatividade} no mercado brasileiro de ações (B3). Optou-se por papéis de grande capitalização e elevado volume médio diário, o que garante menor impacto de mercado na execução das ordens e maior confiabilidade dos dados históricos. Os cinco ativos analisados foram:
+
+\begin{itemize}
+  \item \textbf{PETR4.SA} -- Petróleo Brasileiro S.A. (Petrobras) --- setor de energia
+  \item \textbf{ITUB4.SA} -- Itaú Unibanco Holding S.A. --- setor financeiro
+  \item \textbf{VALE3.SA} -- Vale S.A. --- setor de mineração
+  \item \textbf{ABEV3.SA} -- Ambev S.A. --- setor de bens de consumo
+  \item \textbf{WEGE3.SA} -- WEG S.A. --- setor industrial
+\end{itemize}
+
+\noindent O período analisado compreende \textbf{01/01/2015 a 01/01/2025}, totalizando dez anos de dados diários. Esse intervalo engloba eventos relevantes de mercado --- como a crise política de 2015--2016, a pandemia de COVID-19 (2020), a recuperação econômica (2021--2022) e os ciclos de alta de juros (2022--2023) --- oferecendo condições variadas para avaliação da robustez da estratégia. A janela de dez anos permite, adicionalmente, a aplicação de validação \textit{walk-forward} com cinco anos de treino e um ano de teste, gerando cinco janelas de avaliação fora da amostra.
+
+% ============================================================
+\subsection{Período e Parâmetros de Teste}
+% ============================================================
+
+A Tabela~\ref{tab:params} apresenta as configurações utilizadas durante a execução do \textit{setup}.
+
+\begin{table}[H]
+\centering
+\caption{Parâmetros globais do backtest.}
+\label{tab:params}
+\begin{tabular}{ll}
+  \toprule
+  \textbf{Parâmetro} & \textbf{Valor} \\
+  \midrule
+  Ativos & PETR4, ITUB4, VALE3, ABEV3, WEGE3 \\
+  \textit{Timeframe} & Diário (D1) \\
+  Período total & 01/01/2015 -- 01/01/2025 \\
+  Dados & Ajustados por dividendos e desdobramentos \\
+  Custo operacional & 0{,}30\% por operação \\
+  \textit{Slippage} & 0{,}10\% por operação \\
+  Mínima (entrada) & 7 candles \\
+  Máxima (saída) & 9 candles \\
+  Bollinger -- período & 13 \\
+  Bollinger -- desvio & 1{,}61 \\
+  Capital inicial simulado & R\$~10.000{,}00 (base unitária = 1{,}00) \\
+  Walk-forward -- treino & 5 anos (expansivo) \\
+  Walk-forward -- teste & 1 ano (2020 a 2024) \\
+  Grade de otimização & 27 combinações de parâmetros \\
+  \bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Os dados foram obtidos via Yahoo Finance (biblioteca \texttt{yfinance}), com ajuste automático por dividendos e desdobramentos (\texttt{auto\_adjust=True}), garantindo consistência nas séries de preços ao longo do período.
+
+Para evidenciar a significância dos resultados, foram empregadas as seguintes métricas e técnicas estatísticas:
+
+\begin{itemize}
+  \item \textbf{Sharpe Ratio anualizado:} mede o retorno médio diário ajustado pelo desvio-padrão, anualizado por $\sqrt{252}$ (número de pregões/ano).
+  \begin{equation}
+    \text{Sharpe} = \frac{\bar{r}}{\sigma_r} \times \sqrt{252}
+  \end{equation}
+
+  \item \textbf{CAGR} (\textit{Compound Annual Growth Rate}): taxa de crescimento anual composta, que mede o retorno anualizado considerando o efeito dos juros compostos.
+  \begin{equation}
+    \text{CAGR} = \left(\frac{\text{equity}_T}{\text{equity}_0}\right)^{1/T} - 1
+  \end{equation}
+
+  \item \textbf{Índice de Sortino:} variante do Sharpe que penaliza somente a volatilidade negativa (\textit{downside deviation}), mais adequado para estratégias assimétricas.
+  \begin{equation}
+    \text{Sortino} = \frac{\bar{r}}{\sigma_{\text{down}}} \times \sqrt{252}
+  \end{equation}
+
+  \item \textbf{Índice de Calmar:} razão entre o CAGR e o valor absoluto do máximo \textit{drawdown}, sintetizando a relação retorno-risco em uma única métrica.
+  \begin{equation}
+    \text{Calmar} = \frac{\text{CAGR}}{|\text{Drawdown Máximo}|}
+  \end{equation}
+
+  \item \textbf{Drawdown máximo:} calcula a maior queda percentual observada em relação ao pico anterior da curva de capital.
+  \begin{equation}
+    \text{DD}_t = \frac{\text{equity}_t - \max(\text{equity}_{1..t})}{\max(\text{equity}_{1..t})}
+  \end{equation}
+
+  \item \textbf{Profit Factor:} razão entre a soma dos ganhos brutos e a soma das perdas brutas. Valores acima de 1{,}5 indicam estratégia robusta.
+
+  \item \textbf{Teste $t$ de Student:} testa se a média dos retornos diários da estratégia é estatisticamente diferente de zero ($H_0: \mu = 0$).
+
+  \item \textbf{Bootstrap do Sharpe Ratio:} reamostragem com reposição ($n = 5000$) para construir a distribuição empírica do Sharpe, obtendo $p$-valor e intervalo de confiança de 95\%.
+
+  \item \textbf{Monte Carlo por embaralhamento:} permutação aleatória ($n = 5000$) dos retornos diários, destruindo qualquer estrutura de \textit{timing}. O $p$-valor mede a probabilidade de um Sharpe igual ou superior ao observado surgir por acaso.
+
+  \item \textbf{Deflated Sharpe Ratio (DSR):} proposto por Bailey \& López de Prado (2014), corrige o Sharpe por tamanho finito da amostra, não-normalidade (assimetria $\gamma_3$ e curtose $\gamma_4$) e múltiplos testes. O benchmar $SR^*$ esperado sob $N = 27$ tentativas é:
+  \begin{equation}
+    SR^* = \sigma_{\text{SR}} \left[(1-\gamma_e)\,\Phi^{-1}\!\left(1-\frac{1}{N}\right) + \gamma_e\,\Phi^{-1}\!\left(1-\frac{1}{Ne}\right)\right]
+  \end{equation}
+  onde $\gamma_e \approx 0{,}5772$ é a constante de Euler-Mascheroni e $\sigma_{\text{SR}}$ é o desvio-padrão dos Sharpes calculados nas 27 variantes.
+
+  \item \textbf{White's Reality Check (White, 2000):} testa se a melhor estratégia dentre as $N$ variantes supera o \textit{benchmark} por acaso, usando \textit{bootstrap} centrado para simular a distribuição nula de $V_N = \max_k(\bar{f}_k)$.
+\end{itemize}
+
+% ============================================================
+\subsection{Código Utilizado na Execução do Setup}
+% ============================================================
+
+A implementação computacional foi realizada integralmente em \textbf{Python~3}, com uso das seguintes bibliotecas principais:
+
+\begin{itemize}
+  \item \textbf{yfinance:} download dos dados históricos OHLCV diretamente da API do Yahoo Finance.
+  \item \textbf{pandas:} manipulação de séries temporais e DataFrames, cálculo de retornos e métricas.
+  \item \textbf{numpy:} operações numéricas vetorizadas (Sharpe, médias, somas).
+  \item \textbf{matplotlib:} geração dos gráficos de curva de capital (\textit{equity curve}), \textit{drawdown} e histogramas.
+  \item \textbf{ta} (\textit{Technical Analysis Library}): cálculo das Bandas de Bollinger com parâmetros customizados.
+  \item \textbf{scipy.stats:} testes estatísticos --- teste $t$, funções de distribuição normal e cálculo de assimetria/curtose.
+\end{itemize}
+
+\noindent O código está organizado em sete etapas, descritas a seguir.
+
+\subsubsection*{Etapa 1 -- Importações e configurações globais}
+
+Define os ativos, o período, o \textit{timeframe}, os custos operacionais e as estruturas utilizadas no \textit{walk-forward} e nos testes estatísticos.
+
+\begin{lstlisting}[caption={Bibliotecas e parâmetros globais.}]
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import ta
+from scipy import stats
+from scipy.stats import norm as sci_norm
+
+tickers = ['PETR4.SA', 'ITUB4.SA', 'VALE3.SA', 'ABEV3.SA', 'WEGE3.SA']
+
+data_inicial = '2015-01-01'
+data_final   = '2025-01-01'
+intervalo    = '1d'
+
+custo_op = 0.003  # 0,30%
+slippage = 0.001  # 0,10%
+
+# Grade de 27 variantes para walk-forward e testes WRC/DSR
+PARAM_GRID_WRC = [(pm, px, pb)
+                  for pm in [5, 7, 10]
+                  for px in [7, 9, 12]
+                  for pb in [10, 13, 20]]
+\end{lstlisting}
+
+\subsubsection*{Etapa 2 -- Download dos dados e cálculo dos indicadores}
+
+Para cada ativo, os dados são baixados com ajuste automático por proventos. Em seguida, calculam-se a mínima e máxima rolantes e a banda inferior de Bollinger.
+
+\begin{lstlisting}[caption={Download dos dados e cálculo dos indicadores.}]
+df = yf.download(ticker, start=data_inicial, end=data_final,
+                 interval=intervalo, auto_adjust=True)
+df.columns = df.columns.get_level_values(0)
+
+df['min7']    = df['Low'].rolling(7).min()
+df['max9']    = df['High'].rolling(9).max()
+bb            = ta.volatility.BollingerBands(
+                    close=df['Close'], window=13, window_dev=1.61)
+df['bb_lower'] = bb.bollinger_lband()
+\end{lstlisting}
+
+\subsubsection*{Etapa 3 -- Geração dos sinais e controle de posição}
+
+Os sinais são gerados por condições booleanas e controlados por um loop que impede posições duplas.
+
+\begin{lstlisting}[caption={Geração dos sinais e loop de controle de posição.}]
+df['buy_trigger']  = (df['Close'] <= df['min7']) & \
+                     (df['Close'] <  df['bb_lower'])
+df['exit_trigger'] = df['Close'] >= df['max9']
+
+df['signal'] = 0
+posicionado  = False
+for i in range(len(df)):
+    if not posicionado and df['buy_trigger'].iloc[i]:
+        df.iloc[i, df.columns.get_loc('signal')] = 1
+        posicionado = True
+    elif posicionado and df['exit_trigger'].iloc[i]:
+        df.iloc[i, df.columns.get_loc('signal')] = 0
+        posicionado = False
+    elif posicionado:
+        df.iloc[i, df.columns.get_loc('signal')] = 1
+\end{lstlisting}
+
+\subsubsection*{Etapa 4 -- Retornos líquidos e curva de capital}
+
+O retorno diário é deslocado em 1 candle para evitar \textit{look-ahead}, e os custos são descontados nas transições.
+
+\begin{lstlisting}[caption={Cálculo dos retornos líquidos e curva de capital.}]
+df['returns']      = df['Close'].pct_change()
+df['strategy']     = df['signal'].shift(1) * df['returns']
+mudancas           = df['signal'].diff().abs()
+df['strategy_net'] = df['strategy'] - mudancas * (custo_op + slippage)
+df['equity']       = (1 + df['strategy_net'].fillna(0)).cumprod()
+\end{lstlisting}
+
+\subsubsection*{Etapa 5 -- Métricas de desempenho}
+
+Calcula Sharpe, drawdown, CAGR, Sortino, Calmar, profit factor, payoff e exposição ao mercado.
+
+\begin{lstlisting}[caption={Métricas de desempenho (seleção).}]
+# CAGR
+years = len(ret_diarios) / 252
+cagr  = df['equity'].iloc[-1] ** (1 / years) - 1
+
+# Sortino (volatilidade apenas dos retornos negativos)
+neg     = ret_diarios[ret_diarios < 0]
+sortino = (ret_diarios.mean() / neg.std()) * np.sqrt(252)
+
+# Calmar
+calmar = cagr / abs(max_drawdown)
+
+# Exposicao ao mercado
+exposure = df['signal'].sum() / len(df)
+\end{lstlisting}
+
+\subsubsection*{Etapa 6 -- Otimização walk-forward}
+
+Para cada janela de treino (expansiva), seleciona os parâmetros \texttt{(p\_min, p\_max, p\_bb)} que maximizam o Sharpe no conjunto de treino e os aplica no período de teste de um ano.
+
+\begin{lstlisting}[caption={Núcleo da otimização walk-forward.}]
+for w in WF_WINDOWS:
+    df_tr = df_raw.loc[w['treino_inicio'] : w['treino_fim']]
+    df_te = df_raw.loc[w['teste_inicio']  : w['teste_fim']]
+
+    best_sh, best_p = -np.inf, PARAM_GRID_WRC[0]
+    for (pm, px, pb) in PARAM_GRID_WRC:
+        sh = sharpe_anualizado(_variant_returns(df_tr, pm, px, pb))
+        if sh > best_sh:
+            best_sh, best_p = sh, (pm, px, pb)
+
+    ret_teste = _variant_returns(df_te, *best_p)
+    retorno_fora_amostra = (1 + ret_teste).prod() - 1
+\end{lstlisting}
+
+\subsubsection*{Etapa 7 -- Testes estatísticos}
+
+Executa os cinco testes de validação: teste $t$, bootstrap do Sharpe, Monte Carlo por embaralhamento, Deflated Sharpe Ratio e White's Reality Check.
+
+\begin{lstlisting}[caption={Testes estatísticos (síntese).}]
+# a) Teste t de Student
+t_stat, p_ttest = stats.ttest_1samp(ret, 0)
+
+# b) Bootstrap do Sharpe (n=5000)
+boot_sh = [sharpe(rng.choice(ret, size=T, replace=True)) for _ in range(5000)]
+p_boot  = (np.array(boot_sh) <= 0).mean()
+
+# c) Monte Carlo (permutacao)
+mc_sh = [sharpe(rng.permutation(ret)) for _ in range(5000)]
+p_mc  = (np.array(mc_sh) >= real_sharpe).mean()
+
+# d) Deflated Sharpe Ratio
+sr_star = sigma_sr * ((1-ge)*norm.ppf(1-1/N) + ge*norm.ppf(1-1/(N*e)))
+dsr = norm.cdf((sr_periodo - sr_star/sqrt(252)) / sqrt(var_sr))
+
+# e) White's Reality Check
+V_N        = panel.mean(axis=1).max()
+V_boot     = [(panel[:, idx].mean(axis=1) - f_bar).max() for idx in boot_idx]
+p_wrc      = (np.array(V_boot) >= V_N).mean()
+\end{lstlisting}
+
+% ============================================================
+\section{Resultados}
+% ============================================================
+
+Esta seção apresenta os resultados obtidos na aplicação da estratégia \textit{Duplo 7 Modificado} sobre os cinco ativos da B3 no período 2015--2025. Os resultados são organizados desde a caracterização da base de dados até a validação estatística e síntese comparativa.
+
+% ============================================================
+\subsection{Caracterização da Base de Dados}
+% ============================================================
+
+A Tabela~\ref{fig:tabela_caract} apresenta as principais características das séries temporais utilizadas no estudo, incluindo o período analisado, o número de pregões disponíveis, os preços de abertura e fechamento e o retorno acumulado do próprio ativo (sem aplicação de estratégia).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_caracterizacao.png}
+  \caption{Tabela 1 -- Caracterização dos ativos analisados.}
+  \label{fig:tabela_caract}
+\end{figure}
+
+\noindent Todos os ativos possuem séries completas no período delimitado, sem lacunas relevantes, uma vez que os dados foram obtidos ajustados por dividendos e desdobramentos (\texttt{auto\_adjust=True}). Eventuais dias sem negociação (feriados nacionais) são naturalmente ausentes da série do Yahoo Finance e não comprometem a análise.
+
+% ============================================================
+\subsection{Estrutura das Janelas de Walk-Forward}
+% ============================================================
+
+A validação \textit{out-of-sample} foi realizada por meio de \textit{walk-forward} expansivo com cinco anos de treino e um ano de teste, gerando cinco janelas independentes. A Tabela~\ref{fig:tabela_janelas} detalha os períodos de cada janela.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{Imagens/tabela_wf_janelas.png}
+  \caption{Tabela 2 -- Janelas de treino e teste utilizadas no walk-forward.}
+  \label{fig:tabela_janelas}
+\end{figure}
+
+\noindent A escolha do modelo expansivo justifica-se pelo fato de que, à medida que mais dados históricos se tornam disponíveis, o modelo pode incorporar informações adicionais sem precisar descartar observações anteriores. Para cada janela, a grade de 27 combinações de parâmetros é avaliada integralmente no treino e somente os melhores parâmetros são aplicados no teste.
+
+% ============================================================
+\subsection{Parâmetros Selecionados em Cada Janela de Otimização}
+% ============================================================
+
+A Tabela~\ref{fig:tabela_params} exibe os parâmetros selecionados em cada janela para cada ativo, bem como o Sharpe no treino e o retorno fora da amostra. Essa análise permite verificar se o modelo apresentou estabilidade paramétrica ao longo do tempo ou se houve grande variação.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_wf_params.png}
+  \caption{Tabela 3 -- Parâmetros otimizados por ativo e por janela walk-forward.}
+  \label{fig:tabela_params}
+\end{figure}
+
+\noindent A estabilidade dos parâmetros é um indicativo de robustez: quando os mesmos valores de \texttt{p\_min}, \texttt{p\_max} e \texttt{p\_bb} são selecionados em múltiplas janelas, sugere-se que o padrão identificado é genuíno e não resultado de \textit{overfitting}. Variações expressivas, por outro lado, podem indicar instabilidade e dependência de condições específicas de mercado.
+
+% ============================================================
+\subsection{Desempenho Anual Fora da Amostra}
+% ============================================================
+
+A Figura~\ref{fig:retorno_anual} apresenta o retorno anual obtido em cada ano de teste para todos os ativos. Esses retornos refletem exclusivamente o desempenho com os parâmetros selecionados no treino imediatamente anterior (validação genuinamente fora da amostra).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/retorno_anual_fora.png}
+  \caption{Retorno anual fora da amostra por ativo (walk-forward).}
+  \label{fig:retorno_anual}
+\end{figure}
+
+\noindent O ano de 2020 merece atenção especial, pois engloba a crise de liquidez causada pela pandemia de COVID-19, que gerou movimentos abruptos de queda e recuperação. Anos com consistência positiva entre os ativos indicam que a estratégia captura padrões estruturais do mercado, enquanto anos com resultados negativos generalizados sugerem que as condições de mercado não favoreceram o \textit{setup}.
+
+% ============================================================
+\subsection{Desempenho Acumulado da Estratégia}
+% ============================================================
+
+As curvas de capital (\textit{equity curves}) apresentadas nas Figuras~\ref{fig:comparativo} e~\ref{fig:equity_petr4}--\ref{fig:equity_wege3} mostram a evolução do capital simulado ao longo de todo o período (2015--2025), incluindo os anos de treino e teste.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/comparativo_equity.png}
+  \caption{Comparativo das curvas de capital -- todos os ativos (base = 1{,}00).}
+  \label{fig:comparativo}
+\end{figure}
+
+\noindent A análise das curvas permite identificar quais ativos apresentaram trajetória de crescimento mais consistente, quais sofreram perdas acumuladas e em que períodos a estratégia foi mais ou menos eficiente. Curvas com inclinação suave e poucos recuos indicam baixa volatilidade dos retornos; curvas com grandes oscilações sugerem maior risco operacional.
+
+% ============================================================
+\subsection{Métricas Consolidadas de Desempenho e Risco}
+% ============================================================
+
+A Figura~\ref{fig:metricas_ext} consolida as principais métricas de desempenho e risco, incluindo o retorno acumulado, CAGR, Sharpe, Sortino, Calmar e exposição ao mercado.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_metricas_ext.png}
+  \caption{Tabela 5 -- Métricas consolidadas de desempenho e risco por ativo.}
+  \label{fig:metricas_ext}
+\end{figure}
+
+\noindent O índice de Calmar é particularmente relevante pois relaciona o retorno anualizado (CAGR) com o risco de perda máxima (\textit{drawdown} máximo): valores acima de 1{,}0 indicam que o retorno anual supera a perda máxima observada, o que é desejável em estratégias de menor risco. O índice de Sortino complementa o Sharpe ao excluir a volatilidade positiva do denominador, sendo mais adequado para estratégias que apresentam assimetria nos retornos.
+
+% ============================================================
+\subsection{Análise do Drawdown e dos Períodos de Perda}
+% ============================================================
+
+O \textit{drawdown} mede a queda percentual em relação ao pico anterior da curva de capital e é uma das métricas mais relevantes para avaliar o risco prático da estratégia. As Figuras~\ref{fig:dd_petr4}--\ref{fig:dd_wege3} apresentam as séries de \textit{drawdown} para cada ativo.
+
+\noindent A profundidade e a duração dos períodos de \textit{drawdown} determinam o conforto psicológico necessário para seguir a estratégia. Períodos prolongados de perda podem levar o operador a abandonar o sistema antes da recuperação, comprometendo os resultados de longo prazo. A análise do \textit{drawdown} máximo, em conjunto com o índice de Calmar, oferece uma visão integrada do perfil de risco.
+
+% ============================================================
+\subsection{Exposição ao Mercado e Frequência Operacional}
+% ============================================================
+
+A Figura~\ref{fig:exposicao} apresenta dados sobre o número de operações, os dias posicionado, a exposição ao mercado e o impacto dos custos operacionais para cada ativo.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_exposicao.png}
+  \caption{Tabela 6 -- Frequência operacional e exposição ao mercado por ativo.}
+  \label{fig:exposicao}
+\end{figure}
+
+\noindent Uma exposição ao mercado reduzida é desejável em estratégias de retorno à média, pois indica que o capital fica menos tempo sujeito a oscilações de mercado. Por outro lado, baixa exposição também implica menos oportunidades e pode resultar em menor retorno absoluto. O custo total estimado considera as despesas de entrada e saída de cada operação, permitindo avaliar se os custos comprometem significativamente o desempenho bruto.
+
+% ============================================================
+\subsection{Distribuição dos Retornos Diários da Estratégia}
+% ============================================================
+
+A Figura~\ref{fig:histograma} apresenta os histogramas dos retornos diários da estratégia para cada ativo. A análise da distribuição permite identificar assimetria, concentração próxima de zero e presença de eventos extremos (\textit{outliers}).
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/histograma_retornos.png}
+  \caption{Distribuição dos retornos diários da estratégia por ativo.}
+  \label{fig:histograma}
+\end{figure}
+
+\noindent Em estratégias de retorno à média, espera-se que a distribuição apresente concentração em torno de zero (pois a estratégia fica fora do mercado grande parte do tempo) com leve assimetria positiva nos dias em que está posicionada. Retornos com caudas pesadas à direita indicam que poucos trades contribuem expressivamente para o resultado total, padrão compatível com estratégias de baixa frequência.
+
+% ============================================================
+\subsection{Validação Estatística dos Resultados}
+% ============================================================
+
+A Figura~\ref{fig:tabela_testes} apresenta os resultados dos cinco testes estatísticos aplicados para avaliar se os resultados obtidos são estatisticamente significativos ou atribuíveis ao acaso. As Figuras~\ref{fig:testes_bc_petr4}--\ref{fig:testes_de_wege3} mostram as distribuições empíricas geradas pelos testes para cada ativo.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_testes.png}
+  \caption{Tabela 7 -- Testes estatísticos de validação da estratégia.}
+  \label{fig:tabela_testes}
+\end{figure}
+
+\noindent Os critérios de interpretação adotados são:
+\begin{itemize}
+  \item \textbf{Teste $t$}: $p < 0{,}05$ indica que o retorno médio diário é significativamente diferente de zero.
+  \item \textbf{Bootstrap do Sharpe}: $p < 0{,}05$ indica que o Sharpe observado raramente ocorre em amostras com retorno médio nulo.
+  \item \textbf{Monte Carlo}: $p < 0{,}05$ indica que o Sharpe real dificilmente surgiria de uma série puramente aleatória.
+  \item \textbf{DSR}: valores próximos de 1{,}0 indicam alta probabilidade do Sharpe verdadeiro ser positivo, mesmo após corriger para múltiplos testes.
+  \item \textbf{White's Reality Check}: $p < 0{,}05$ indica que a melhor variante da estratégia supera o \textit{benchmark} com significância estatística.
+\end{itemize}
+
+% ============================================================
+\subsection{Comparação Geral entre os Ativos Analisados}
+% ============================================================
+
+A Figura~\ref{fig:comparativo_geral} sintetiza os principais resultados de todos os ativos em uma tabela comparativa, incluindo a avaliação geral baseada em critérios de robustez.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/tabela_comparativo.png}
+  \caption{Tabela 8 -- Síntese comparativa dos ativos analisados.}
+  \label{fig:comparativo_geral}
+\end{figure}
+
+\noindent A avaliação geral (\textit{Forte}/\textit{Moderada}/\textit{Fraca}) considera quatro critérios simultâneos: Sharpe $> 1{,}0$; DSR $> 0{,}90$; White's RC com $p < 0{,}05$; e \textit{drawdown} máximo $< 30\%$. Ativos que atendem a três ou quatro critérios recebem avaliação \textit{Forte}, dois critérios recebem \textit{Moderada} e um ou zero recebem \textit{Fraca}. Ressalta-se que o retorno acumulado isolado não é critério suficiente para uma avaliação positiva: um ativo pode ter retorno elevado mas Sharpe baixo (alta volatilidade) ou \textit{drawdown} elevado, comprometendo a robustez prática da estratégia.
+
+% ============================================================
+\subsection{Síntese dos Principais Achados}
+% ============================================================
+
+Com base nos resultados apresentados nas seções anteriores, é possível sintetizar os seguintes achados:
+
+\begin{itemize}
+  \item \textbf{Desempenho fora da amostra:} os retornos anuais fora da amostra variaram significativamente entre os ativos e os anos de teste, indicando que a estratégia não apresenta desempenho uniforme em todos os contextos de mercado. Ativos com maior liquidez e menor volatilidade histórica tenderam a resultados mais consistentes.
+
+  \item \textbf{Consistência da estratégia:} a análise das curvas de capital revela que a estratégia foi mais eficaz nos períodos de mercado com volatilidade moderada e tendência de alta, enquanto apresentou maior dificuldade em contextos de alta volatilidade abrupta (como 2020).
+
+  \item \textbf{Estabilidade dos parâmetros otimizados:} a análise da Tabela~3 permite avaliar se os parâmetros selecionados nas janelas de treino são estáveis ao longo do tempo. Alta variação nos parâmetros pode indicar instabilidade e suscetibilidade ao \textit{overfitting}.
+
+  \item \textbf{Impacto dos custos operacionais:} a comparação entre retorno bruto e retorno líquido (Tabela~6) evidencia o impacto dos custos de transação. Estratégias de alta frequência operacional são mais sensíveis a esses custos, podendo converter resultados positivos brutos em resultados líquidos desfavoráveis.
+
+  \item \textbf{Testes estatísticos:} a validação estatística é essencial para distinguir resultados genuínos de artefatos de \textit{data snooping}. O DSR e o White's Reality Check, por corrigirem para múltiplos testes, são os indicadores mais exigentes e conservadores. Apenas ativos que apresentam resultados favoráveis nesses dois testes simultaneamente podem ser considerados com robustez estatística.
+
+  \item \textbf{Robustez geral:} a estratégia demonstra maior robustez em ativos com histórico de retorno à média mais pronunciado, característico de papéis com alta liquidez e menor dominância de tendência. A aplicação do duplo filtro (mínima + Bollinger) mostra-se mais seletiva que o \textit{Double-7} original, gerando menos operações, porém com maior precisão nos sinais de entrada.
+\end{itemize}
+
+% ============================================================
+\section{Análise por Ativo}
+% ============================================================
+
+% --------------------------------------------------------
+\subsection{PETR4.SA -- Petróleo Brasileiro S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_PETR4.png}
+  \caption{Curva de capital -- PETR4.SA.}
+  \label{fig:equity_petr4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_PETR4.png}
+  \caption{Drawdown (\%) -- PETR4.SA.}
+  \label{fig:dd_petr4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_bc_PETR4.png}
+  \caption{Bootstrap do Sharpe e Monte Carlo -- PETR4.SA.}
+  \label{fig:testes_bc_petr4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_de_PETR4.png}
+  \caption{DSR e White's Reality Check -- PETR4.SA.}
+  \label{fig:testes_de_petr4}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{ITUB4.SA -- Itaú Unibanco}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_ITUB4.png}
+  \caption{Curva de capital -- ITUB4.SA.}
+  \label{fig:equity_itub4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_ITUB4.png}
+  \caption{Drawdown (\%) -- ITUB4.SA.}
+  \label{fig:dd_itub4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_bc_ITUB4.png}
+  \caption{Bootstrap do Sharpe e Monte Carlo -- ITUB4.SA.}
+  \label{fig:testes_bc_itub4}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_de_ITUB4.png}
+  \caption{DSR e White's Reality Check -- ITUB4.SA.}
+  \label{fig:testes_de_itub4}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{VALE3.SA -- Vale S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_VALE3.png}
+  \caption{Curva de capital -- VALE3.SA.}
+  \label{fig:equity_vale3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_VALE3.png}
+  \caption{Drawdown (\%) -- VALE3.SA.}
+  \label{fig:dd_vale3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_bc_VALE3.png}
+  \caption{Bootstrap do Sharpe e Monte Carlo -- VALE3.SA.}
+  \label{fig:testes_bc_vale3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_de_VALE3.png}
+  \caption{DSR e White's Reality Check -- VALE3.SA.}
+  \label{fig:testes_de_vale3}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{ABEV3.SA -- Ambev S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_ABEV3.png}
+  \caption{Curva de capital -- ABEV3.SA.}
+  \label{fig:equity_abev3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_ABEV3.png}
+  \caption{Drawdown (\%) -- ABEV3.SA.}
+  \label{fig:dd_abev3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_bc_ABEV3.png}
+  \caption{Bootstrap do Sharpe e Monte Carlo -- ABEV3.SA.}
+  \label{fig:testes_bc_abev3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_de_ABEV3.png}
+  \caption{DSR e White's Reality Check -- ABEV3.SA.}
+  \label{fig:testes_de_abev3}
+\end{figure}
+
+% --------------------------------------------------------
+\subsection{WEGE3.SA -- WEG S.A.}
+% --------------------------------------------------------
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/equity_WEGE3.png}
+  \caption{Curva de capital -- WEGE3.SA.}
+  \label{fig:equity_wege3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/drawdown_WEGE3.png}
+  \caption{Drawdown (\%) -- WEGE3.SA.}
+  \label{fig:dd_wege3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_bc_WEGE3.png}
+  \caption{Bootstrap do Sharpe e Monte Carlo -- WEGE3.SA.}
+  \label{fig:testes_bc_wege3}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{Imagens/testes_de_WEGE3.png}
+  \caption{DSR e White's Reality Check -- WEGE3.SA.}
+  \label{fig:testes_de_wege3}
+\end{figure}
+
+\end{document}
